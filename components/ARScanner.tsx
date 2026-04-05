@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { ARButton, useHitTest, useARSession } from '@react-three/xr';
+import { ARButton, useXRHitTest } from '@react-three/xr';
 import * as THREE from 'three';
 
 // Australian pricing data by region
@@ -29,13 +29,7 @@ function RoomScannerOverlay({ onMeasurement }: { onMeasurement: (m: RoomMeasurem
   const reticleRef = useRef<THREE.Group>(null);
   const hitTestResult = useRef<any>(null);
   
-  useARSession({
-    requiredFeatures: ['hit-test'],
-    optionalFeatures: ['dom-overlay', 'depth-sensing'],
-    domOverlay: { root: document.getElementById('ar-overlay') || document.body },
-  });
-
-  useHitTest((hitMatrix, hit) => {
+  useXRHitTest((hitMatrix, hit) => {
     hitTestResult.current = { hitMatrix, hit };
     
     if (reticleRef.current && scanning) {

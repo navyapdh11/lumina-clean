@@ -1,6 +1,7 @@
 'use client';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, useGLTF, XR, createXRStore } from '@react-three/xr';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
+import { XR, createXRStore, useGLTF } from '@react-three/xr';
 import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import * as THREE from 'three';
 
