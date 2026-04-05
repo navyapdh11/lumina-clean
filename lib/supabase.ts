@@ -19,7 +19,7 @@ export function getSupabaseClient() {
       global: {
         headers: {
           'X-Client-Info': 'lumina-clean-v5.0',
-        },
+        } as Record<string, string>,
       },
       db: {
         schema: 'public',
