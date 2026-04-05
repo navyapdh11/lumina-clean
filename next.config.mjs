@@ -1,11 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  swcMinify: true,
+  transpilePackages: ['three', '@react-three/fiber', '@react-three/drei', '@react-three/xr', 'leaflet', 'react-leaflet'],
   images: {
-    domains: ['your-supabase-project.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
   webpack: (config) => {
-    config.externals = [...config.externals, 'three'];
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      canvas: false,
+    };
     return config;
   },
 };
