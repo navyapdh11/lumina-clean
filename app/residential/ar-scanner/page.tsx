@@ -1,15 +1,5 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
-
-const ARScanner = dynamic(() => import('@/components/ARScanner'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full min-h-[500px] bg-gray-900 rounded-2xl animate-pulse flex items-center justify-center">
-      <div className="text-white text-xl">Loading AR Scanner...</div>
-    </div>
-  ),
-});
+import ARScannerClient from './ARScannerClient';
 
 export const metadata: Metadata = {
   title: 'AR Room Scanner | Instant Cleaning Quotes | LuminaClean',
@@ -91,22 +81,7 @@ export default function ARScannerPage() {
 
       {/* AR Scanner */}
       <div className="container mx-auto px-4 pb-16 max-w-4xl">
-        <Suspense fallback={<div className="text-white text-center py-20">Loading...</div>}>
-          <ARScanner
-            onQuoteGenerated={(quote) => {
-              console.log('Quote generated:', quote);
-              // Analytics event
-              if (typeof window !== 'undefined' && (window as any).gtag) {
-                (window as any).gtag('event', 'ar_quote_generated', {
-                  area: quote.area,
-                  bedrooms: quote.bedrooms,
-                  price: quote.estimatedPrice,
-                  region: quote.region,
-                });
-              }
-            }}
-          />
-        </Suspense>
+        <ARScannerClient />
       </div>
 
       {/* Features Section */}

@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   transpilePackages: ['three', '@react-three/fiber', '@react-three/drei', '@react-three/xr', 'leaflet', 'react-leaflet'],
   images: {
     remotePatterns: [
