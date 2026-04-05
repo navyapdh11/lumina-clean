@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { SEOSchema } from '@/components/SEOSchema';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -60,7 +59,6 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded">
           Skip to main content
         </a>
-        <SEOSchema />
         <main id="main-content" role="main">
           {children}
         </main>
@@ -69,6 +67,30 @@ export default function RootLayout({
           <p>© 2026 LuminaClean. Enterprise Cleaning Services Australia. All rights reserved.</p>
           <p className="mt-2">ABN: 12 345 678 901 | 1300-LUMINA | WCAG 2.2 AA Compliant</p>
         </footer>
+
+        {/* Inline JSON-LD for SEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'LocalBusiness',
+              name: 'LuminaClean',
+              telephone: '1300-LUMINA',
+              address: { '@type': 'PostalAddress', addressCountry: 'AU' },
+              areaServed: [
+                { '@type': 'State', name: 'New South Wales' },
+                { '@type': 'State', name: 'Victoria' },
+                { '@type': 'State', name: 'Queensland' },
+                { '@type': 'State', name: 'Western Australia' },
+                { '@type': 'State', name: 'South Australia' },
+                { '@type': 'State', name: 'Tasmania' },
+                { '@type': 'State', name: 'ACT' },
+                { '@type': 'State', name: 'Northern Territory' },
+              ],
+            }),
+          }}
+        />
       </body>
     </html>
   );
