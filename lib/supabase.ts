@@ -21,9 +21,7 @@ export function getSupabaseClient() {
           'X-Client-Info': 'lumina-clean-v5.0',
         } as Record<string, string>,
       },
-      db: {
-        schema: 'public',
-      },
+      db: {},
       realtime: {
         params: {
           eventsPerSecond: 10,
