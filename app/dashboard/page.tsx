@@ -2,7 +2,29 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
+// Force dynamic rendering to avoid build-time Supabase errors
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export default async function DashboardPage() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+  
+  // Skip Supabase calls during build/placeholder mode
+  if (supabaseUrl.includes('placeholder') || supabaseKey === 'placeholder') {
+    return (
+      <main className="min-h-screen bg-gray-900 text-white p-8">
+        <h1 className="text-3xl font-bold mb-6">LuminaClean Dashboard</h1>
+        <p className="text-gray-400">Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables to enable full dashboard functionality.</p>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="bg-gray-800 p-6 rounded-lg"><h2 className="font-semibold">AR Scanner</h2><p className="text-sm text-gray-400">Active</p></div>
+          <div className="bg-gray-800 p-6 rounded-lg"><h2 className="font-semibold">Strata Leads</h2><p className="text-sm text-gray-400">52,000+</p></div>
+          <div className="bg-gray-800 p-6 rounded-lg"><h2 className="font-semibold">Bookings</h2><p className="text-sm text-gray-400">Coming soon</p></div>
+        </div>
+      </main>
+    );
+  }
+
   const supabase = createServerComponentClient({ cookies });
   const { data: { user } } = await supabase.auth.getUser();
 
