@@ -29,7 +29,8 @@ function RoomScannerOverlay({ onMeasurement }: { onMeasurement: (m: RoomMeasurem
   const reticleRef = useRef<THREE.Group>(null);
   const hitTestResult = useRef<any>(null);
   
-  useXRHitTest((hitMatrix, hit) => {
+  useXRHitTest((_, hit) => {
+    const hitMatrix = hit.pose?.localToViewerMatrix || hit.pose?.localToCameraMatrix;
     hitTestResult.current = { hitMatrix, hit };
     
     if (reticleRef.current && scanning) {
