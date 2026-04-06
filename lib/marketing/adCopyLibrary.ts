@@ -122,7 +122,7 @@ export const EMAIL_SEQUENCES: EmailSequence[] = [
     day: 1,
     subject: 'Your Clean Is Waiting — Complete Booking in 2 Minutes 🕒',
     preview: 'Your quote is reserved for 6 more hours...',
-    body: `Hi {{firstName}},\n\nYou were so close! Your quote for {{serviceType}} at ${{quoteAmount}} is still reserved — but only for 6 hours.\n\n⭐ "Best clean in 5 years of Sydney living!" — Emma R.\n\nUse code SAVE10 for extra $10 off in the next 2 hours.\n\n👉 Complete Your Booking: [Resume Checkout]`,
+    body: "Hi {{firstName}},\n\nYou were so close! Your quote for {{serviceType}} at ${{quoteAmount}} is still reserved — but only for 6 hours.\n\n⭐ \"Best clean in 5 years of Sydney living!\" — Emma R.\n\nUse code SAVE10 for extra $10 off in the next 2 hours.\n\n👉 Complete Your Booking: [Resume Checkout]",
   },
   {
     id: 'email-review',
