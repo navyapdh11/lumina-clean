@@ -1,0 +1,289 @@
+// LuminaClean v5.0 - Enterprise Database Schema
+// Target: PostgreSQL (CockroachDB compatible)
+// Provider: postgresql with full-text search extensions
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, pg_trgm]
+}
+
+// === ENUMS ===
+
+enum ServiceType {
+  RESIDENTIAL
+  COMMERCIAL
+  STRATA
+  END_OF_LEASE
+  BOND_CLEAN
+}
+
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  OFFICE
+  RETAIL
+  WAREHOUSE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum State {
+  NSW
+  VIC
+  QLD
+  WA
+  SA
+  TAS
+  ACT
+  NT
+}
+
+enum LoyaltyTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+// === MODELS ===
+
+model Customer {
+  id            String        @id @default(uuid())
+  email         String        @unique @db.VarChar(255)
+  phone         String?       @db.VarChar(20)
+  firstName     String        @db.VarChar(100)
+  lastName      String        @db.VarChar(100)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  loyaltyTier   LoyaltyTier   @default(BRONZE)
+  bookings      Booking[]
+  addresses     Address[]
+  reviews       Review[]
+
+  @@index([email])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Address {
+  id            String   @id @default(uuid())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  streetAddress String   @db.VarChar(255)
+  suburb        String   @db.VarChar(100)
+  state         State
+  postcode      String   @db.Char(4)
+  isDefault     Boolean  @default(false)
+  latitude      Float?
+  longitude     Float?
+  createdAt     DateTime @default(now())
+
+  @@index([customerId])
+  @@index([postcode, state])
+  @@map("addresses")
+}
+
+model Booking {
+  id                  String        @id @default(uuid())
+  customerId          String
+  customer            Customer      @relation(fields: [customerId], references: [id])
+  serviceType         ServiceType
+  propertyType        PropertyType
+  bedrooms            Int?
+  bathrooms           Int
+  squareMeters        Float?
+  postcode            String        @db.Char(4)
+  state               State
+  suburb              String?       @db.VarChar(100)
+  streetAddress       String?       @db.VarChar(255)
+  scheduledDate       DateTime
+  estimatedDuration   Float
+  status              BookingStatus @default(PENDING)
+  cleanerId           String?
+  cleaner             Cleaner?      @relation(fields: [cleanerId], references: [id])
+  totalPrice          Decimal       @db.Decimal(10, 2)
+  gstAmount           Decimal       @db.Decimal(10, 2)
+  specialRequests     BookingSpecialRequest[]
+  accessInstructions  String?       @db.VarChar(500)
+  paymentIntentId     String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  cancelledAt         DateTime?
+  cancellationReason  String?       @db.VarChar(500)
+
+  @@index([customerId])
+  @@index([cleanerId])
+  @@index([status, scheduledDate])
+  @@index([state, scheduledDate])
+  @@index([postcode, state])
+  @@map("bookings")
+}
+
+// Junction table for booking special requests (replaces String[])
+model BookingSpecialRequest {
+  id        String  @id @default(uuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  request   String  @db.VarChar(100)
+
+  @@unique([bookingId, request])
+  @@index([bookingId])
+  @@map("booking_special_requests")
+}
+
+model Cleaner {
+  id                String   @id @default(uuid())
+  email             String   @unique @db.VarChar(255)
+  phone             String   @unique @db.VarChar(20)
+  firstName         String   @db.VarChar(100)
+  lastName          String   @db.VarChar(100)
+  abn               String   @unique @db.VarChar(50)
+  insurancePolicy   String?  @db.VarChar(100)
+  insuranceExpiry   DateTime?
+  policeCheckExpiry DateTime?
+  isActive          Boolean  @default(true)
+  baseHourlyRate    Decimal  @db.Decimal(10, 2)
+  statesServed      CleanerState[]
+  rating            Float    @default(0.0)
+  totalJobs         Int      @default(0)
+  bookings          Booking[]
+  availability      CleanerAvailability[]
+  reviews           Review[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([rating])
+  @@map("cleaners")
+}
+
+// Junction table for cleaner states (replaces State[])
+model CleanerState {
+  id        String  @id @default(uuid())
+  cleanerId String
+  cleaner   Cleaner @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
+  state     State
+
+  @@unique([cleanerId, state])
+  @@index([cleanerId])
+  @@map("cleaner_states")
+}
+
+model CleanerAvailability {
+  id          String   @id @default(uuid())
+  cleanerId   String
+  cleaner     Cleaner  @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  startTime   String   @db.VarChar(5)
+  endTime     String   @db.VarChar(5)
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([cleanerId, date, startTime, endTime])
+  @@index([cleanerId, date])
+  @@map("cleaner_availability")
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  bookingId       String   @unique @db.VarChar(36)
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  cleanerId       String
+  cleaner         Cleaner  @relation(fields: [cleanerId], references: [id])
+  rating          Int
+  reviewText      String?  @db.Text
+  punctuality     Int?
+  quality         Int?
+  professionalism Int?
+  wouldRecommend  Boolean?
+  createdAt       DateTime @default(now())
+
+  @@index([cleanerId])
+  @@index([rating])
+  @@index([customerId])
+  @@map("reviews")
+}
+
+model PriceHistory {
+  id           String   @id @default(uuid())
+  postcode     String   @db.Char(4)
+  state        State
+  baseRate     Decimal  @db.Decimal(10, 2)
+  demandFactor Float
+  recordedAt   DateTime @default(now())
+
+  @@index([postcode, state, recordedAt])
+  @@map("price_history")
+}
+
+model DispatchOptimization {
+  id              String   @id @default(uuid())
+  state           State
+  date            DateTime @db.Date
+  timeWindowStart String?  @db.VarChar(5)
+  timeWindowEnd   String?  @db.VarChar(5)
+  optimizationGoal String? @db.VarChar(50)
+  mctsIterations  Int
+  status          String   @default("RUNNING") @db.VarChar(20)
+  assignments     DispatchAssignment[]
+  totalTravelSaved Int?
+  avgUtilization Float?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([state, date])
+  @@index([status])
+  @@map("dispatch_optimizations")
+}
+
+model DispatchAssignment {
+  id              String   @id @default(uuid())
+  optimizationId  String
+  optimization    DispatchOptimization @relation(fields: [optimizationId], references: [id], onDelete: Cascade)
+  bookingId       String   @db.VarChar(36)
+  cleanerId       String   @db.VarChar(36)
+  travelTime      Int
+  routeOrder      Int      @default(0)
+
+  @@unique([optimizationId, bookingId])
+  @@index([optimizationId])
+  @@index([cleanerId])
+  @@map("dispatch_assignments")
+}
+
+model StrataLead {
+  id              String   @id @default(uuid())
+  externalId      String   @unique @db.VarChar(100)
+  name            String   @db.VarChar(200)
+  title           String   @db.VarChar(200)
+  company         String   @db.VarChar(300)
+  location        String   @db.VarChar(300)
+  postcode        String   @db.Char(4)
+  state           State
+  profileUrl      String?  @db.VarChar(500)
+  email           String?  @db.VarChar(255)
+  phone           String?  @db.VarChar(20)
+  propertyCount   Int?
+  lastActive      DateTime?
+  scrapedAt       DateTime @default(now())
+  status          String   @default("new") @db.VarChar(20)
+  notes           String?  @db.Text
+
+  @@index([state])
+  @@index([status])
+  @@index([company])
+  @@map("strata_leads")
+}
