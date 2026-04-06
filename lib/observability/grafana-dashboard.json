@@ -1,0 +1,114 @@
+# LuminaClean v5.0 - Grafana Dashboard for CRO
+# Import via Grafana: Dashboard → Import → Paste JSON
+
+{
+  "dashboard": {
+    "title": "CleanCRO Agent — CRO Dashboard",
+    "tags": ["cro", "lumina-clean", "conversion"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Conversion Rate by Region",
+        "type": "timeseries",
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          { "expr": "cro_conversion_rate{region=~\"$region\"}", "legendFormat": "{{region}}" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 0.15 } },
+        "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table" } }
+      },
+      {
+        "id": 2,
+        "title": "MCTS Optimization Score",
+        "type": "gauge",
+        "gridPos": { "x": 12, "y": 0, "w": 6, "h": 8 },
+        "targets": [
+          { "expr": "cro_mcts_score{region=~\"$region\"}", "legendFormat": "Score" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 1, "thresholds": { "steps": [{ "value": 0, "color": "red" }, { "value": 0.7, "color": "yellow" }, { "value": 0.9, "color": "green" }] } } }
+      },
+      {
+        "id": 3,
+        "title": "Deployments (24h)",
+        "type": "stat",
+        "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          { "expr": "sum(increase(cro_deploy_total[24h]))", "legendFormat": "Total" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "short" } }
+      },
+      {
+        "id": 4,
+        "title": "Deployment Success Rate",
+        "type": "stat",
+        "gridPos": { "x": 18, "y": 4, "w": 6, "h": 4 },
+        "targets": [
+          { "expr": "sum(rate(cro_deploy_success[24h])) / sum(rate(cro_deploy_total[24h]))", "legendFormat": "Success %" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{ "value": 0, "color": "red" }, { "value": 0.9, "color": "green" }] } } }
+      },
+      {
+        "id": 5,
+        "title": "Revenue Impact by Region",
+        "type": "bargauge",
+        "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          { "expr": "cro_revenue_lift{region=~\"$region\"}", "legendFormat": "{{region}}" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "currencyAUD", "color": { "mode": "continuous-GrYlRd" } } }
+      },
+      {
+        "id": 6,
+        "title": "Active Experiments",
+        "type": "table",
+        "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          { "expr": "cro_experiment_count{region=~\"$region\"}", "legendFormat": "{{region}}" }
+        ],
+        "transformations": [{ "id": "labelsToFields" }],
+        "fieldConfig": { "defaults": { "unit": "short" } }
+      },
+      {
+        "id": 7,
+        "title": "MCTS Optimization Latency",
+        "type": "timeseries",
+        "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
+        "targets": [
+          { "expr": "histogram_quantile(0.95, rate(cro_mcts_latency_bucket[5m]))", "legendFormat": "p95" },
+          { "expr": "histogram_quantile(0.50, rate(cro_mcts_latency_bucket[5m]))", "legendFormat": "p50" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "ms" } }
+      },
+      {
+        "id": 8,
+        "title": "Rollback Rate",
+        "type": "stat",
+        "gridPos": { "x": 12, "y": 16, "w": 6, "h": 6 },
+        "targets": [
+          { "expr": "sum(increase(cro_rollback_total[24h]))", "legendFormat": "Rollbacks" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 1, "color": "yellow" }, { "value": 5, "color": "red" }] } } }
+      },
+      {
+        "id": 9,
+        "title": "Mobile vs Desktop CR",
+        "type": "piechart",
+        "gridPos": { "x": 18, "y": 16, "w": 6, "h": 6 },
+        "targets": [
+          { "expr": "cro_mobile_conversion_rate{region=~\"$region\"}", "legendFormat": "Mobile" },
+          { "expr": "cro_desktop_conversion_rate{region=~\"$region\"}", "legendFormat": "Desktop" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "percentunit" } }
+      }
+    ],
+    "templating": {
+      "list": [
+        { "name": "region", "type": "query", "query": "label_values(cro_conversion_rate, region)", "multi": true, "includeAll": true, "allValue": ".*" }
+      ]
+    },
+    "time": { "from": "now-24h", "to": "now" },
+    "refresh": "30s"
+  },
+  "overwrite": true
+}
