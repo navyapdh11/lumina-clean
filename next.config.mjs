@@ -1,12 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['three', '@react-three/fiber', '@react-three/drei', '@react-three/xr', 'leaflet', 'react-leaflet'],
+  transpilePackages: ['three', '@react-three/fiber', '@react-three/drei', '@react-three/xr'],
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: '*.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lumina-clean.com.au',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.vercel.app',
       },
     ],
   },

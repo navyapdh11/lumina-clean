@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
       totRecommendations: totResults.slice(0, 5),
       status: 'completed',
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Optimization failed', details: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Optimization failed' }, { status: 500 });
   }
 }
 

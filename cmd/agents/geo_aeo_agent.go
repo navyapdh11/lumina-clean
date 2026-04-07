@@ -745,7 +745,7 @@ func detectAustralianRegion(html string) string {
 		"QLD": {"brisbane", "gold coast", "sunshine coast", "queensland"},
 		"WA":  {"perth", "fremantle", "western australia"},
 		"SA":  {"adelaide", "mount gambier", "south australia"},
-		"TAS": {" hobart", "launceston", "tasmania"},
+		"TAS": {"hobart", "launceston", "tasmania"},
 		"ACT": {"canberra", "act", "australian capital territory"},
 		"NT":  {"darwin", "palmerston", "northern territory"},
 	}

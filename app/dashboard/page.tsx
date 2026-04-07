@@ -133,12 +133,14 @@ function RevenueChart() {
 
 // ── Region Breakdown ───────────────────────────────────────────────
 function RegionBreakdown() {
-  const regionData = REGIONS.map((r) => ({
-    code: r,
-    bookings: Math.floor(Math.random() * 15 + 3),
-    revenue: Math.floor(Math.random() * 8000 + 2000),
-  })).sort((a, b) => b.revenue - a.revenue);
-  const maxRevenue = regionData[0].revenue;
+  const regionData = useMemo(() => {
+    return REGIONS.map((r) => ({
+      code: r,
+      bookings: Math.floor(Math.random() * 15 + 3),
+      revenue: Math.floor(Math.random() * 8000 + 2000),
+    })).sort((a, b) => b.revenue - a.revenue);
+  }, []);
+  const maxRevenue = regionData[0]?.revenue || 1;
 
   return (
     <div className="bg-gray-800/60 backdrop-blur rounded-xl p-5 border border-gray-700/50">

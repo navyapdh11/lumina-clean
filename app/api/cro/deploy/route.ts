@@ -2,9 +2,28 @@
  * LuminaClean v5.0 - CRO Deploy API
  * Handles auto-deployment of CRO variants to connected websites
  * Supports Next.js, Shopify, WordPress, and custom CMS
+ *
+ * Security: Admin-only access with API key validation
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
+// Admin API key validation
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+
+const DeploySchema = z.object({
+  variantId: z.string().min(1, 'variantId is required'),
+  region: z.enum(['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT']),
+  site: z.string().optional(),
+  type: z.enum(['cta', 'layout', 'pricing', 'form', 'trust']),
+  deployedBy: z.string().optional().default('Auto-Deploy'),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+const RollbackSchema = z.object({
+  deploymentId: z.string().min(1, 'deploymentId is required'),
+});
 
 // In-memory deployment log
 const deploymentLog: Array<{
@@ -19,25 +38,50 @@ const deploymentLog: Array<{
   changes: string[];
 }> = [];
 
+function isAdminAuthorized(req: NextRequest): boolean {
+  const authHeader = req.headers.get('authorization');
+  const cookieRole = req.cookies.get('lc_role')?.value;
+
+  if (cookieRole === 'admin') return true;
+
+  if (ADMIN_API_KEY && authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    return token === ADMIN_API_KEY;
+  }
+
+  return false;
+}
+
 // === POST /api/cro/deploy — Deploy a CRO variant ===
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { variantId, region, site, type, deployedBy = 'Auto-Deploy', confidence } = body;
-
-    // Validation
-    if (!variantId || !region || !type) {
-      return NextResponse.json({ error: 'variantId, region, and type are required' }, { status: 400 });
+    if (!isAdminAuthorized(req)) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
+    const body = await req.json();
+    const validation = DeploySchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: validation.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { variantId, region, site, type, deployedBy = 'Auto-Deploy', confidence } = validation.data;
+
     // Enterprise gate: require minimum confidence
-    if (confidence && confidence < 0.85) {
-      return NextResponse.json({
-        error: 'Confidence below 85% threshold',
-        confidence,
-        status: 'pending_review',
-        message: 'Variant requires manual review before deployment',
-      }, { status: 400 });
+    if (confidence !== undefined && confidence < 0.85) {
+      return NextResponse.json(
+        {
+          error: 'Confidence below 85% threshold',
+          confidence,
+          status: 'pending_review',
+          message: 'Variant requires manual review before deployment',
+        },
+        { status: 400 }
+      );
     }
 
     // Simulate deployment
@@ -66,37 +110,54 @@ export async function POST(req: NextRequest) {
       changes,
       message: `Variant ${variantId} deployed to ${region}`,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Deployment failed', details: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Deployment failed' }, { status: 500 });
   }
 }
 
 // === GET /api/cro/deploy — Get deployment history ===
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const region = searchParams.get('region');
-  const limit = parseInt(searchParams.get('limit') || '20');
+  try {
+    const { searchParams } = new URL(req.url);
+    const region = searchParams.get('region');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-  let log = [...deploymentLog].reverse();
-  if (region) {
-    log = log.filter(d => d.region === region);
+    let log = [...deploymentLog].reverse();
+    if (region) {
+      log = log.filter((d) => d.region === region);
+    }
+
+    return NextResponse.json({
+      deployments: log.slice(0, limit),
+      total: log.length,
+      successCount: log.filter((d) => d.status === 'success').length,
+      rollbackCount: log.filter((d) => d.status === 'rolled_back').length,
+    });
+  } catch {
+    return NextResponse.json({ error: 'Failed to fetch deployment history' }, { status: 500 });
   }
-
-  return NextResponse.json({
-    deployments: log.slice(0, limit),
-    total: log.length,
-    successCount: log.filter(d => d.status === 'success').length,
-    rollbackCount: log.filter(d => d.status === 'rolled_back').length,
-  });
 }
 
-// === POST /api/cro/deploy/rollback — Rollback a deployment ===
+// === PATCH /api/cro/deploy — Rollback a deployment ===
 export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { deploymentId } = body;
+    if (!isAdminAuthorized(req)) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
 
-    const deployment = deploymentLog.find(d => d.id === deploymentId);
+    const body = await req.json();
+    const validation = RollbackSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: validation.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { deploymentId } = validation.data;
+
+    const deployment = deploymentLog.find((d) => d.id === deploymentId);
     if (!deployment) {
       return NextResponse.json({ error: 'Deployment not found' }, { status: 404 });
     }
@@ -114,12 +175,12 @@ export async function PATCH(req: NextRequest) {
       status: 'rolled_back',
       message: `Deployment ${deploymentId} rolled back`,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Rollback failed', details: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Rollback failed' }, { status: 500 });
   }
 }
 
-function generateDeploymentChanges(variantId: string, region: string, type: string): string[] {
+function generateDeploymentChanges(variantId: string, _region: string, _type: string): string[] {
   const changes: Record<string, string[]> = {
     cta_blue: ['Changed CTA button color to blue', 'Updated hover state', 'Applied to all regions'],
     cta_green: ['Changed CTA button color to green', 'A/B test configured', '50/50 traffic split'],
@@ -127,10 +188,10 @@ function generateDeploymentChanges(variantId: string, region: string, type: stri
     form_simplified: ['Reduced booking form from 8 to 4 steps', 'Added postcode autocomplete', 'Removed optional fields from step 1'],
     pricing_dynamic: ['Added dynamic pricing calculator', 'GST-inclusive pricing display', 'Region-based pricing active'],
     layout_mobile: ['Mobile-first layout applied', 'Increased touch targets to 48px', 'Reduced form steps on mobile'],
-    urgency_banner: ['Added "Limited Slots Today" banner', 'Dynamic slot counter implemented', 'Geo-targeted to ' + region],
+    urgency_banner: ['Added "Limited Slots Today" banner', 'Dynamic slot counter implemented'],
     ar_hero: ['Moved AR Scanner to hero section', 'Updated hero headline', 'Added "Try AR" CTA button'],
     reviews_widget: ['Added 4.8★ Google Reviews widget', 'Displaying 5,000+ review count', 'Auto-updating via API'],
     calculator: ['Added instant quote calculator', 'Region-specific pricing loaded', 'GST breakdown included'],
   };
-  return changes[variantId] || [`Applied ${type} variant to ${region}`];
+  return changes[variantId] || [`Applied variant to target region`];
 }

@@ -1,10 +1,16 @@
-// @ts-nocheck - Three.js JSX elements don't have strict TypeScript definitions
+/*
+ * OfficeScene — 3D office before/after visualization.
+ * Uses @react-three/fiber primitives which have type resolution
+ * issues with certain TypeScript configs. Runtime is fully functional.
+ * 
+ * @see https://github.com/pmndrs/react-three-fiber/issues/2396
+ */
 'use client';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
 import { XR, createXRStore } from '@react-three/xr';
 import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
-import * as THREE from 'three';
+import type { Mesh, Object3D } from 'three';
 
 // Preload GLTF to prevent memory leaks
 useGLTF.preload('/models/office-before.glb');
@@ -17,7 +23,7 @@ interface OfficeModelProps {
 
 function OfficeModel({ modelPath, scale = 1.8 }: OfficeModelProps) {
   const { scene } = useGLTF(modelPath);
-  const ref = useRef<THREE.Group>(null);
+  const ref = useRef<Object3D>(null);
   
   // Subtle idle animation
   useFrame((state) => {
@@ -30,12 +36,12 @@ function OfficeModel({ modelPath, scale = 1.8 }: OfficeModelProps) {
     // Cleanup on unmount to prevent memory leaks
     return () => {
       if (scene) {
-        scene.traverse((object) => {
-          if ((object as THREE.Mesh).isMesh) {
-            const mesh = object as THREE.Mesh;
+        scene.traverse((object: Object3D) => {
+          if ((object as Mesh).isMesh) {
+            const mesh = object as Mesh;
             mesh.geometry?.dispose();
             if (Array.isArray(mesh.material)) {
-              mesh.material.forEach((mat) => mat.dispose());
+              mesh.material.forEach((mat: any) => mat.dispose());
             } else {
               mesh.material?.dispose();
             }
@@ -49,7 +55,7 @@ function OfficeModel({ modelPath, scale = 1.8 }: OfficeModelProps) {
 }
 
 function FallbackModel() {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const meshRef = useRef<Mesh>(null);
   
   useFrame((state) => {
     if (meshRef.current) {
@@ -117,11 +123,10 @@ export default function OfficeScene({ onCleanComplete }: OfficeSceneProps) {
               />
             </Suspense>
             
-            <OrbitControls 
-              enablePan={false} 
-              minDistance={3} 
+            <OrbitControls
+              enablePan={false}
+              minDistance={3}
               maxDistance={10}
-              ariaLabel="3D scene controls"
             />
             <Environment preset="warehouse" />
           </XR>

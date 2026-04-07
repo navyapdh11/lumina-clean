@@ -1,6 +1,9 @@
 'use client';
 import { XRButton as DreiXRButton } from '@react-three/xr';
+import type { ComponentProps } from 'react';
 
-export default function XRButton({ children, ...props }: any) {
-  return <DreiXRButton {...props}>{children}</DreiXRButton>;
+type XRButtonProps = ComponentProps<typeof DreiXRButton>;
+
+export default function XRButton(props: XRButtonProps) {
+  return <DreiXRButton {...props} />;
 }

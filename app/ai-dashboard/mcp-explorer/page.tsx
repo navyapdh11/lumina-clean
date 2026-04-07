@@ -10,6 +10,16 @@ interface MCPResource {
   status: 'available' | 'unavailable';
 }
 
+interface ToolResult {
+  tool: string;
+  status: string;
+  trace: string;
+  output: string;
+  confidence: number;
+  reflectionCycles: number;
+  timestamp: string;
+}
+
 interface MCPTool {
   name: string;
   description: string;
@@ -101,7 +111,7 @@ export default function MCPExplorerPage() {
   const [selectedRole, setSelectedRole] = useState('admin');
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [toolPayload, setToolPayload] = useState('');
-  const [toolResult, setToolResult] = useState<any>(null);
+  const [toolResult, setToolResult] = useState<ToolResult | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState<'resources' | 'tools' | 'capabilities'>('resources');
 

@@ -1,9 +1,23 @@
-// @ts-nocheck
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Grid, Text, RoundedBox } from '@react-three/drei';
-import * as THREE from 'three';
+import { OrbitControls, Grid, Text } from '@react-three/drei';
+import { ACESFilmicToneMapping } from 'three';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
+
+// ── Types ──────────────────────────────────────────────────────────
+interface Quote {
+  area: number;
+  bedrooms: number;
+  estimatedPrice: number;
+  region: string;
+}
+
+interface PricingInfo {
+  baseRate: number;
+  minPrice: number;
+  name: string;
+}
 
 // ── Australian Pricing ─────────────────────────────────────────────
 const PRICING_DATA: Record<string, { baseRate: number; minPrice: number; name: string }> = {
@@ -131,7 +145,7 @@ function Scene({ width, length, height, isScanning }: { width: number; length: n
   return (
     <Canvas
       shadows
-      gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping }}
+      gl={{ antialias: true, alpha: true, toneMapping: ACESFilmicToneMapping }}
       camera={{ position: [width + 2, height + 1, length + 2], fov: 50 }}
       style={{ background: '#0f172a' }}
     >
@@ -154,7 +168,7 @@ function Scene({ width, length, height, isScanning }: { width: number; length: n
 }
 
 // ── Quote Display ──────────────────────────────────────────────────
-function QuoteDisplay({ quote, onReset }: { quote: any; onReset: () => void }) {
+function QuoteDisplay({ quote, onReset }: { quote: Quote; onReset: () => void }) {
   if (!quote) return null;
 
   return (
@@ -200,7 +214,7 @@ function QuoteDisplay({ quote, onReset }: { quote: any; onReset: () => void }) {
 }
 
 // ── Manual Entry Form ──────────────────────────────────────────────
-function ManualEntryForm({ onQuoteGenerated, userRegion }: { onQuoteGenerated: (q: any) => void; userRegion: string }) {
+function ManualEntryForm({ onQuoteGenerated, userRegion }: { onQuoteGenerated: (q: Quote) => void; userRegion: string }) {
   const [area, setArea] = useState('65');
   const [bedrooms, setBedrooms] = useState('2');
 
@@ -269,14 +283,25 @@ interface ARScannerProps {
 
 export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
   const [userRegion, setUserRegion] = useState('NSW');
-  const [mode, setMode] = useState<'form' | 'quote' | '3d'>('form');
-  const [quote, setQuote] = useState<any>(null);
+  const [mode, setMode] = useState<'form' | '3d' | 'quote'>('form');
+  const [quote, setQuote] = useState<Quote | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const mountedRef = useRef(true);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Room dimensions (editable in 3D mode)
   const [roomWidth, setRoomWidth] = useState(8);
   const [roomLength, setRoomLength] = useState(6);
   const [roomHeight, setRoomHeight] = useState(2.7);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    };
+  }, []);
 
   // Auto-detect region from geolocation
   useEffect(() => {
@@ -293,13 +318,13 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
           else if (lat > -36 && lat < -34 && lng > 148 && lng < 150) setUserRegion('ACT');
           else if (lat > -26 && lat < -10 && lng > 129 && lng < 138) setUserRegion('NT');
         },
-        () => {}
+        (err) => console.warn('Geolocation unavailable, defaulting to NSW:', err.code, err.message)
       );
     }
   }, []);
 
   const handleQuoteGenerated = useCallback(
-    (q: any) => {
+    (q: Quote) => {
       setQuote(q);
       setMode('quote');
       onQuoteGenerated?.(q);
@@ -316,13 +341,14 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
     setMode('3d');
     setIsScanning(true);
     // Simulate scan completing after 3 seconds
-    setTimeout(() => {
+    scanTimerRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
       setIsScanning(false);
       // Auto-generate quote from room dimensions
       const area = roomWidth * roomLength;
       const pricing = PRICING_DATA[userRegion] || PRICING_DATA.NSW;
       const estimatedPrice = Math.max(pricing.minPrice, Math.round(area * pricing.baseRate));
-      const q = { area, bedrooms: Math.round(area / 25), estimatedPrice, region: userRegion };
+      const q: Quote = { area, bedrooms: Math.round(area / 25), estimatedPrice, region: userRegion };
       setQuote(q);
       setMode('quote');
       onQuoteGenerated?.(q);
@@ -429,7 +455,9 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
 
           {/* 3D Canvas */}
           <div className="w-full h-[400px] bg-gray-900 rounded-2xl overflow-hidden border border-gray-700/50 relative">
-            <Scene width={roomWidth} length={roomLength} height={roomHeight} isScanning={isScanning} />
+            <ErrorBoundary name="3D Room Scanner">
+              <Scene width={roomWidth} length={roomLength} height={roomHeight} isScanning={isScanning} />
+            </ErrorBoundary>
 
             {/* Scan overlay */}
             {isScanning && (
@@ -468,7 +496,9 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
         <>
           {/* Show 3D scene with final room */}
           <div className="w-full h-[300px] bg-gray-900 rounded-2xl overflow-hidden border border-gray-700/50">
-            <Scene width={roomWidth} length={roomLength} height={roomHeight} isScanning={false} />
+            <ErrorBoundary name="3D Room Preview">
+              <Scene width={roomWidth} length={roomLength} height={roomHeight} isScanning={false} />
+            </ErrorBoundary>
           </div>
           <QuoteDisplay quote={quote} onReset={handleReset} />
         </>
