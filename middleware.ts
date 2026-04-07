@@ -1,65 +1,37 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Routes that require authentication
 const protectedRoutes = ['/dashboard', '/api/scraping', '/api/admin'];
 
-// Routes that require admin role
-const adminOnlyRoutes = ['/api/scraping', '/api/admin'];
-
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const pathname = req.nextUrl.pathname;
 
-  // Only use Supabase if env vars are configured
+  // Only apply auth guard if Supabase is properly configured
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const isSupabaseConfigured = supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder');
+  const isSupabaseConfigured =
+    supabaseUrl &&
+    supabaseKey &&
+    !supabaseUrl.includes('placeholder') &&
+    !supabaseUrl.includes('your-project');
 
-  let session: any = null;
-
-  if (isSupabaseConfigured) {
-    try {
-      const supabase = createMiddlewareClient({ req, res });
-      const { data } = await supabase.auth.getSession();
-      session = data.session;
-    } catch (error) {
-      console.warn('Middleware Supabase error:', error);
-    }
+  // Skip auth if Supabase is not configured (dev/demo mode)
+  if (!isSupabaseConfigured) {
+    // Add security headers even in dev mode
+    addSecurityHeaders(res);
+    return res;
   }
 
   // Check if route requires authentication
-  if (isSupabaseConfigured && protectedRoutes.some(route => pathname.startsWith(route))) {
-    if (!session) {
-      const redirectUrl = new URL('/login', req.url);
+  if (protectedRoutes.some(route => pathname.startsWith(route))) {
+    // Check for session cookie
+    const hasSession = req.cookies.get('sb-access-token') || req.cookies.get('__session');
+    if (!hasSession) {
+      const redirectUrl = new URL('/auth/login', req.url);
       redirectUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(redirectUrl);
-    }
-
-    // Check if route requires admin role
-    if (adminOnlyRoutes.some(route => pathname.startsWith(route))) {
-      try {
-        const supabase = createMiddlewareClient({ req, res });
-        const { data: user } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-
-        if (user?.role !== 'admin') {
-          return NextResponse.json(
-            { error: 'Forbidden: Admin access required' },
-            { status: 403 }
-          );
-        }
-      } catch (error) {
-        console.warn('Admin check error:', error);
-        return NextResponse.json(
-          { error: 'Authentication error' },
-          { status: 500 }
-        );
-      }
     }
   }
 
