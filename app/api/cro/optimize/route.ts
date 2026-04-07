@@ -6,7 +6,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runMCTS } from '@/lib/cro/engine/mcts';
 import { runToTAnalysis } from '@/lib/cro/agents/recommender';
-import { validateABN, validatePostcode, calculateGST } from '@/lib/validation/cro';
+import { validateABN, calculateGST } from '@/lib/validation/cro';
+
+const AU_REGIONS = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'] as const;
+
+function validateRegion(region: string): boolean {
+  return AU_REGIONS.includes(region as typeof AU_REGIONS[number]);
+}
 
 // In-memory store (replace with Redis/DB in production)
 const experiments = new Map();
@@ -23,8 +29,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'region and currentCR are required' }, { status: 400 });
     }
 
-    if (!validatePostcode(region)) {
-      return NextResponse.json({ error: `Invalid region: ${region}. Valid: NSW, VIC, QLD, WA, SA, TAS, ACT, NT` }, { status: 400 });
+    if (!validateRegion(region)) {
+      return NextResponse.json({ error: `Invalid region: ${region}. Valid: ${AU_REGIONS.join(', ')}` }, { status: 400 });
     }
 
     // Variant IDs to test
