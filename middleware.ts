@@ -17,16 +17,8 @@ export async function middleware(req: NextRequest) {
     !supabaseUrl.includes('placeholder') &&
     !supabaseUrl.includes('your-project');
 
-  // Skip auth if Supabase is not configured (dev/demo mode)
-  if (!isSupabaseConfigured) {
-    // Add security headers even in dev mode
-    addSecurityHeaders(res);
-    return res;
-  }
-
-  // Check if route requires authentication
-  if (protectedRoutes.some(route => pathname.startsWith(route))) {
-    // Check for session cookie
+  // Check auth if Supabase is configured
+  if (isSupabaseConfigured && protectedRoutes.some(route => pathname.startsWith(route))) {
     const hasSession = req.cookies.get('sb-access-token') || req.cookies.get('__session');
     if (!hasSession) {
       const redirectUrl = new URL('/auth/login', req.url);
@@ -36,7 +28,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Security headers (OWASP Top 10 remediation)
-  const securityHeaders = {
+  const securityHeaders: Record<string, string> = {
     'X-DNS-Prefetch-Control': 'on',
     'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
     'X-XSS-Protection': '1; mode=block',
