@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Text } from '@react-three/drei';
-import { ACESFilmicToneMapping } from 'three';
+import { ACESFilmicToneMapping, type Mesh } from 'three';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -33,8 +33,8 @@ const PRICING_DATA: Record<string, { baseRate: number; minPrice: number; name: s
 
 // ── 3D Room Component ──────────────────────────────────────────────
 function Room3D({ width, length, height, isScanning }: { width: number; length: number; height: number; isScanning: boolean }) {
-  const floorRef = useRef<THREE.Mesh>(null);
-  const scanLineRef = useRef<THREE.Mesh>(null);
+  const floorRef = useRef<Mesh>(null);
+  const scanLineRef = useRef<Mesh>(null);
   const [scanProgress, setScanProgress] = useState(0);
 
   useFrame((state) => {
