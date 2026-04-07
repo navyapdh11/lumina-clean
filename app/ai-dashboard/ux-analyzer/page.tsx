@@ -2,6 +2,26 @@
 
 import { useState } from 'react';
 
+// SSRF prevention: block internal/private IPs
+function isSafeUrl(input: string): boolean {
+  try {
+    const url = new URL(input);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    const hostname = url.hostname.toLowerCase();
+    const blocked = [
+      'localhost', '127.', '0.', '10.', '172.16.', '172.17.', '172.18.',
+      '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
+      '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.',
+      '172.31.', '192.168.', '169.254.', '[::1]', '[fe80:',
+      'metadata.google.internal', '169.254.169.254',
+    ];
+    if (blocked.some((b) => hostname.startsWith(b) || hostname === b)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface GoTNode {
   id: string;
   type: 'thought' | 'aggregation' | 'reflection' | 'output';
@@ -73,6 +93,10 @@ export default function UXAnalyzerPage() {
   const [currentStep, setCurrentStep] = useState('');
 
   const runAnalysis = async () => {
+    if (!isSafeUrl(url)) {
+      alert('Invalid or blocked URL. Only public http(s):// URLs are allowed. Private/internal IPs are blocked.');
+      return;
+    }
     setIsAnalyzing(true);
     setResult(null);
 

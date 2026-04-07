@@ -1,17 +1,25 @@
 /**
  * LuminaClean v5.0 - CRO API Routes
  * Handles MCTS optimization, variant deployment, and metrics
+ * Security: Auth required for all operations
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { runMCTS } from '@/lib/cro/engine/mcts';
 import { runToTAnalysis } from '@/lib/cro/agents/recommender';
-import { validateABN, calculateGST } from '@/lib/validation/cro';
 
 const AU_REGIONS = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'] as const;
 
 function validateRegion(region: string): boolean {
   return AU_REGIONS.includes(region as typeof AU_REGIONS[number]);
+}
+
+function hasValidSession(req: NextRequest): boolean {
+  const cookie =
+    req.cookies.get('lc_session')?.value ||
+    req.cookies.get('sb-access-token')?.value;
+  if (!cookie) return false;
+  return cookie.split('.').length === 3;
 }
 
 // In-memory store (replace with Redis/DB in production)
@@ -20,11 +28,14 @@ const deployments = new Map();
 
 // === POST /api/cro/optimize — Run MCTS + ToT optimization ===
 export async function POST(req: NextRequest) {
+  if (!hasValidSession(req)) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { region, currentCR, sessions, conversions, avgOrderValue } = body;
 
-    // Validation
     if (!region || !currentCR) {
       return NextResponse.json({ error: 'region and currentCR are required' }, { status: 400 });
     }
@@ -33,14 +44,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Invalid region: ${region}. Valid: ${AU_REGIONS.join(', ')}` }, { status: 400 });
     }
 
-    // Variant IDs to test
     const variantIds = [
       'cta_blue', 'cta_green', 'trust_badges', 'form_simplified',
       'pricing_dynamic', 'layout_mobile', 'urgency_banner',
       'ar_hero', 'reviews_widget', 'calculator',
     ];
 
-    // Run MCTS
     const mctsResults = runMCTS({
       region,
       currentCR: currentCR || 0.03,
@@ -49,14 +58,12 @@ export async function POST(req: NextRequest) {
       avgOrderValue: avgOrderValue || 250,
     }, variantIds);
 
-    // Run ToT analysis
     const totResults = runToTAnalysis(region, {
       mobileCR: currentCR * 0.6,
       desktopCR: currentCR * 1.3,
       bounceRate: 0.45,
     });
 
-    // Store experiment
     const experimentId = `exp_${Date.now()}`;
     experiments.set(experimentId, {
       id: experimentId,
@@ -81,6 +88,10 @@ export async function POST(req: NextRequest) {
 
 // === GET /api/cro/optimize — Get experiment results ===
 export async function GET(req: NextRequest) {
+  if (!hasValidSession(req)) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const experimentId = searchParams.get('id');
 
@@ -92,7 +103,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(exp);
   }
 
-  // Return all experiments
   return NextResponse.json({
     experiments: Array.from(experiments.values()),
     count: experiments.size,

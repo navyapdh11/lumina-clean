@@ -130,7 +130,7 @@ async function fetchStrataLeadsFromBrightData(targetStates: string[]): Promise<S
     return true;
   });
 
-  return dedupedLeads.slice(0, 52000); // Cap at 52k leads
+  return dedupedLeads.slice(0, 1000); // Cap at 1k to prevent memory exhaustion
 }
 
 // Import leads to Supabase CRM
@@ -268,10 +268,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('LinkedIn scraper error:', error);
     return NextResponse.json(
-      { error: 'Scraper failed', details: error.message },
+      { error: 'Scraper failed. Please try again later.' },
       { status: 500 }
     );
   }
@@ -286,9 +286,9 @@ export async function GET(req: NextRequest) {
       message: 'Configure Supabase to enable full functionality',
       rateLimit: checkRateLimit('status', 100, 60000),
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { error: 'Status check failed', details: error.message },
+      { error: 'Status check failed' },
       { status: 500 }
     );
   }

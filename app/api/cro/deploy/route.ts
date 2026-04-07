@@ -3,10 +3,11 @@
  * Handles auto-deployment of CRO variants to connected websites
  * Supports Next.js, Shopify, WordPress, and custom CMS
  *
- * Security: Admin-only access with API key validation
+ * Security: Admin-only access with API key validation (timing-safe)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 
 // Admin API key validation
@@ -40,13 +41,18 @@ const deploymentLog: Array<{
 
 function isAdminAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization');
-  const cookieRole = req.cookies.get('lc_role')?.value;
 
-  if (cookieRole === 'admin') return true;
-
+  // API key validation with constant-time comparison (prevents timing attacks)
   if (ADMIN_API_KEY && authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
-    return token === ADMIN_API_KEY;
+    try {
+      const keyBuffer = Buffer.from(ADMIN_API_KEY);
+      const tokenBuffer = Buffer.from(token);
+      if (keyBuffer.length !== tokenBuffer.length) return false;
+      return timingSafeEqual(keyBuffer, tokenBuffer);
+    } catch {
+      return false;
+    }
   }
 
   return false;

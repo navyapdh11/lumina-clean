@@ -1,5 +1,6 @@
 // SEO/AEO Schema.org components for LuminaClean v5.0
 // Implements GEO entities, LocalBusiness, Service, and FAQ schemas
+// XSS-safe: all schema values are sanitized before JSON-LD injection
 
 import { AUSTRALIAN_REGIONS, generateSEOMetadata } from '@/lib/australian-regions';
 
@@ -7,6 +8,22 @@ interface SEOProps {
   pageType?: 'home' | 'service' | 'location' | 'scanner' | 'dashboard';
   regionCode?: string;
   serviceType?: string;
+}
+
+// Sanitize schema values to prevent XSS via JSON-LD
+function sanitizeSchemaValue(obj: unknown): unknown {
+  if (typeof obj === 'string') {
+    return obj.replace(/[<>&"']/g, (c) =>
+      ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#x27;' }[c]!)
+    );
+  }
+  if (Array.isArray(obj)) return obj.map(sanitizeSchemaValue);
+  if (obj && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, sanitizeSchemaValue(v)])
+    );
+  }
+  return obj;
 }
 
 // LocalBusiness Schema
@@ -57,7 +74,7 @@ function LocalBusinessSchema() {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(sanitizeSchemaValue(schema)) }}
     />
   );
 }
@@ -93,7 +110,7 @@ function ServiceSchema({ serviceType = 'CleaningServices' }: { serviceType?: str
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(sanitizeSchemaValue(schema)) }}
     />
   );
 }
@@ -140,7 +157,7 @@ function LocationSchema({ regionCode }: { regionCode: string }) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(sanitizeSchemaValue(schema)) }}
     />
   );
 }
@@ -197,7 +214,7 @@ function FAQSchema() {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(sanitizeSchemaValue(schema)) }}
     />
   );
 }
@@ -218,7 +235,7 @@ function BreadcrumbSchema({ items }: { items: { name: string; url: string }[] })
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(sanitizeSchemaValue(schema)) }}
     />
   );
 }

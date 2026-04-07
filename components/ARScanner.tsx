@@ -55,9 +55,23 @@ function loadSavedRooms(): SavedRoom[] {
 
 function saveRoomsToStorage(rooms: SavedRoom[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
+    // Enforce 4MB localStorage limit (strip images if too large)
+    let data = JSON.stringify(rooms);
+    let safeRooms = rooms;
+    if (data.length > 4 * 1024 * 1024) {
+      safeRooms = rooms.map((r) => ({ ...r, image: undefined }));
+      data = JSON.stringify(safeRooms);
+    }
+    // If still too large, keep only the 50 most recent
+    if (data.length > 4 * 1024 * 1024) {
+      safeRooms = safeRooms.slice(0, 50);
+      data = JSON.stringify(safeRooms);
+    }
+    localStorage.setItem(STORAGE_KEY, data);
   } catch {
-    console.warn('Failed to save rooms to localStorage');
+    console.warn('Failed to save rooms — storage full, clearing images');
+    const noImages = rooms.map((r) => ({ ...r, image: undefined })).slice(0, 50);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(noImages));
   }
 }
 
