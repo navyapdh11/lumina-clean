@@ -8,17 +8,26 @@ import { ACESFilmicToneMapping, type Mesh } from 'three';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 // ── Types ──────────────────────────────────────────────────────────
-interface Quote {
+export interface Quote {
   area: number;
   bedrooms: number;
   estimatedPrice: number;
   region: string;
 }
 
-interface PricingInfo {
-  baseRate: number;
-  minPrice: number;
+interface SavedRoom {
+  id: string;
   name: string;
+  width: number;
+  length: number;
+  height: number;
+  area: number;
+  bedrooms: number;
+  estimatedPrice: number;
+  region: string;
+  image?: string; // base64 preview
+  createdAt: string;
+  notes: string;
 }
 
 // ── Australian Pricing ─────────────────────────────────────────────
@@ -33,6 +42,25 @@ const PRICING_DATA: Record<string, { baseRate: number; minPrice: number; name: s
   NT: { baseRate: 3.19, minPrice: 179, name: 'Northern Territory' },
 };
 
+const STORAGE_KEY = 'lumina_saved_rooms';
+
+function loadSavedRooms(): SavedRoom[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRoomsToStorage(rooms: SavedRoom[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
+  } catch {
+    console.warn('Failed to save rooms to localStorage');
+  }
+}
+
 // ── 3D Room Component ──────────────────────────────────────────────
 function Room3D({ width, length, height, isScanning }: { width: number; length: number; height: number; isScanning: boolean }) {
   const floorRef = useRef<Mesh>(null);
@@ -43,11 +71,9 @@ function Room3D({ width, length, height, isScanning }: { width: number; length: 
     if (isScanning && scanProgress < 1) {
       setScanProgress((p) => Math.min(p + 0.015, 1));
     }
-    // Animate scan line
     if (scanLineRef.current && isScanning) {
       scanLineRef.current.position.z = -length / 2 + length * scanProgress;
     }
-    // Subtle floor pulse when scanning
     if (floorRef.current && isScanning) {
       const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.05 + 1;
       floorRef.current.scale.set(pulse, 1, pulse);
@@ -60,13 +86,10 @@ function Room3D({ width, length, height, isScanning }: { width: number; length: 
 
   return (
     <group>
-      {/* Floor */}
       <mesh ref={floorRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[width, length]} />
         <meshStandardMaterial color={floorColor} roughness={0.8} metalness={0.2} />
       </mesh>
-
-      {/* Grid overlay */}
       <Grid
         position={[0, 0.01, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -81,33 +104,23 @@ function Room3D({ width, length, height, isScanning }: { width: number; length: 
         fadeStrength={1}
         infiniteGrid={false}
       />
-
-      {/* Back wall */}
       <mesh position={[0, height / 2, -length / 2]} castShadow>
         <boxGeometry args={[width, height, 0.05]} />
         <meshStandardMaterial color={wallColor} roughness={0.6} metalness={0.3} />
       </mesh>
-
-      {/* Left wall */}
       <mesh position={[-width / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]} castShadow>
         <boxGeometry args={[length, height, 0.05]} />
         <meshStandardMaterial color={wallColor} roughness={0.6} metalness={0.3} />
       </mesh>
-
-      {/* Right wall (semi-transparent for visibility) */}
       <mesh position={[width / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]} castShadow>
         <boxGeometry args={[length, height, 0.05]} />
         <meshStandardMaterial color={wallColor} roughness={0.6} metalness={0.3} transparent opacity={0.3} />
       </mesh>
-
-      {/* Edge lines */}
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(width, 0.05, length)]} />
         <lineBasicMaterial color={edgeColor} linewidth={1} />
         <mesh position={[0, 0.025, 0]} />
       </lineSegments>
-
-      {/* Dimension labels */}
       <Text position={[0, -0.3, length / 2 + 0.5]} fontSize={0.3} color="#93c5fd" anchorX="center" anchorY="middle">
         {width.toFixed(1)}m
       </Text>
@@ -117,21 +130,15 @@ function Room3D({ width, length, height, isScanning }: { width: number; length: 
       <Text position={[0, -0.3, -length / 2 - 0.5]} fontSize={0.3} color="#93c5fd" anchorX="center" anchorY="middle">
         {length.toFixed(1)}m
       </Text>
-
-      {/* Area label on floor */}
       <Text position={[0, 0.05, 0]} fontSize={0.4} color="#34d399" anchorX="center" anchorY="middle" rotation={[-Math.PI / 2, 0, 0]}>
         {(width * length).toFixed(1)} m²
       </Text>
-
-      {/* Scan line effect */}
       {isScanning && (
         <mesh ref={scanLineRef} position={[0, height / 2, -length / 2]}>
           <boxGeometry args={[width, height, 0.02]} />
           <meshStandardMaterial color="#3b82f6" transparent opacity={0.4} emissive="#3b82f6" emissiveIntensity={0.5} />
         </mesh>
       )}
-
-      {/* Corner markers */}
       {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, z], i) => (
         <mesh key={i} position={[x * width / 2, 0.05, z * length / 2]}>
           <sphereGeometry args={[0.08, 16, 16]} />
@@ -154,11 +161,9 @@ function Scene({ width, length, height, isScanning }: { width: number; length: n
       <ambientLight intensity={0.4} />
       <directionalLight position={[10, 15, 10]} intensity={1} castShadow />
       <pointLight position={[-5, 5, -5]} intensity={0.3} color="#3b82f6" />
-
       <Room3D width={width} length={length} height={height} isScanning={isScanning} />
-
       <OrbitControls
-        enablePan={true}
+        enablePan
         minDistance={3}
         maxDistance={25}
         minPolarAngle={0.2}
@@ -169,10 +174,310 @@ function Scene({ width, length, height, isScanning }: { width: number; length: n
   );
 }
 
-// ── Quote Display ──────────────────────────────────────────────────
-function QuoteDisplay({ quote, onReset }: { quote: Quote; onReset: () => void }) {
-  if (!quote) return null;
+// ── Saved Room Card ────────────────────────────────────────────────
+function SavedRoomCard({
+  room,
+  onEdit,
+  onDelete,
+  onLoad,
+}: {
+  room: SavedRoom;
+  onEdit: (room: SavedRoom) => void;
+  onDelete: (id: string) => void;
+  onLoad: (room: SavedRoom) => void;
+}) {
+  return (
+    <div className="bg-gray-800/60 backdrop-blur rounded-xl border border-gray-700/50 overflow-hidden hover:border-blue-500/50 transition group">
+      {/* Image preview */}
+      {room.image ? (
+        <div className="relative h-32 bg-gray-900 overflow-hidden">
+          <img src={room.image} alt={room.name} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent" />
+        </div>
+      ) : (
+        <div className="h-2 bg-gradient-to-r from-blue-600 to-purple-600" />
+      )}
 
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="min-w-0 flex-1">
+            <h4 className="font-semibold text-white truncate">{room.name}</h4>
+            <p className="text-xs text-gray-400">
+              {room.region} • {new Date(room.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+          <span className="text-lg font-bold text-green-400 ml-2">${room.estimatedPrice}</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-xs text-gray-400 mb-3">
+          <div className="bg-gray-700/50 rounded px-2 py-1.5 text-center">
+            <div className="text-white font-medium">{room.area.toFixed(1)}m²</div>
+            Area
+          </div>
+          <div className="bg-gray-700/50 rounded px-2 py-1.5 text-center">
+            <div className="text-white font-medium">{room.bedrooms}</div>
+            Beds
+          </div>
+          <div className="bg-gray-700/50 rounded px-2 py-1.5 text-center">
+            <div className="text-white font-medium">{room.width}×{room.length}m</div>
+            Room
+          </div>
+        </div>
+
+        {room.notes && (
+          <p className="text-xs text-gray-500 mb-3 truncate">{room.notes}</p>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => onLoad(room)}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded-lg transition"
+          >
+            Load
+          </button>
+          <button
+            onClick={() => onEdit(room)}
+            className="px-3 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-2 rounded-lg transition"
+            title="Edit"
+          >
+            ✏️
+          </button>
+          <button
+            onClick={() => onDelete(room.id)}
+            className="px-3 bg-red-900/50 hover:bg-red-800/50 text-red-400 hover:text-red-300 text-xs font-medium py-2 rounded-lg transition border border-red-700/30"
+            title="Delete"
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Room Modal ────────────────────────────────────────────────
+function EditRoomModal({
+  room,
+  onSave,
+  onCancel,
+}: {
+  room: SavedRoom;
+  onSave: (room: SavedRoom) => void;
+  onCancel: () => void;
+}) {
+  const [editRoom, setEditRoom] = useState<SavedRoom>({ ...room });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be under 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setEditRoom((prev) => ({ ...prev, image: ev.target?.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = () => {
+    if (!editRoom.name.trim()) {
+      alert('Room name is required');
+      return;
+    }
+    if (editRoom.width < 1 || editRoom.length < 1 || editRoom.height < 1) {
+      alert('Dimensions must be at least 1m');
+      return;
+    }
+    const pricing = PRICING_DATA[editRoom.region] || PRICING_DATA.NSW;
+    const area = editRoom.width * editRoom.length;
+    const estimatedPrice = Math.max(pricing.minPrice, Math.round(area * pricing.baseRate));
+    onSave({ ...editRoom, area, estimatedPrice });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-700">
+          <h3 className="text-lg font-bold text-white">✏️ Edit Room</h3>
+          <button onClick={onCancel} className="text-gray-400 hover:text-white text-xl transition" aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Room Name</label>
+            <input
+              type="text"
+              value={editRoom.name}
+              onChange={(e) => setEditRoom((p) => ({ ...p, name: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Living Room"
+            />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Room Photo</label>
+            {editRoom.image ? (
+              <div className="relative rounded-lg overflow-hidden border border-gray-700">
+                <img src={editRoom.image} alt="Room" className="w-full h-40 object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 hover:opacity-100 transition">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg transition"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    onClick={() => setEditRoom((p) => ({ ...p, image: undefined }))}
+                    className="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded-lg transition"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-gray-600 hover:border-blue-500 rounded-lg p-6 text-center transition"
+              >
+                <div className="text-3xl mb-2">📷</div>
+                <div className="text-gray-400 text-sm">Click to upload room photo</div>
+                <div className="text-gray-500 text-xs mt-1">PNG, JPG up to 5MB</div>
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* Dimensions */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Width (m)</label>
+              <input
+                type="number"
+                value={editRoom.width}
+                onChange={(e) => setEditRoom((p) => ({ ...p, width: parseFloat(e.target.value) || 1 }))}
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                max="50"
+                step="0.5"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Length (m)</label>
+              <input
+                type="number"
+                value={editRoom.length}
+                onChange={(e) => setEditRoom((p) => ({ ...p, length: parseFloat(e.target.value) || 1 }))}
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                max="50"
+                step="0.5"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Height (m)</label>
+              <input
+                type="number"
+                value={editRoom.height}
+                onChange={(e) => setEditRoom((p) => ({ ...p, height: parseFloat(e.target.value) || 2 }))}
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                max="10"
+                step="0.1"
+              />
+            </div>
+          </div>
+
+          {/* Bedrooms + Region */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Bedrooms</label>
+              <input
+                type="number"
+                value={editRoom.bedrooms}
+                onChange={(e) => setEditRoom((p) => ({ ...p, bedrooms: parseInt(e.target.value) || 1 }))}
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                max="10"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Region</label>
+              <select
+                value={editRoom.region}
+                onChange={(e) => setEditRoom((p) => ({ ...p, region: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.keys(PRICING_DATA).map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Notes</label>
+            <textarea
+              value={editRoom.notes}
+              onChange={(e) => setEditRoom((p) => ({ ...p, notes: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              rows={2}
+              placeholder="Optional notes..."
+            />
+          </div>
+
+          {/* Price preview */}
+          <div className="bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 text-center">
+            <span className="text-sm text-blue-300">Estimated Price: </span>
+            <span className="text-xl font-bold text-white">${editRoom.estimatedPrice}</span>
+            <span className="text-xs text-gray-400 ml-2">({editRoom.area.toFixed(1)}m²)</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 p-5 border-t border-gray-700">
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-2.5 rounded-lg transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition"
+          >
+            💾 Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Quote Display ──────────────────────────────────────────────────
+function QuoteDisplay({
+  quote,
+  onReset,
+  onSave,
+}: {
+  quote: Quote;
+  onReset: () => void;
+  onSave: () => void;
+}) {
   return (
     <div className="w-full bg-gradient-to-br from-green-900/80 to-emerald-800/80 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-green-700/50 text-center">
       <div className="text-5xl mb-4">✨</div>
@@ -200,13 +505,19 @@ function QuoteDisplay({ quote, onReset }: { quote: Quote; onReset: () => void })
         </div>
       </div>
 
-      <div className="flex gap-4 justify-center flex-wrap">
+      <div className="flex gap-3 justify-center flex-wrap">
         <button className="bg-white text-green-900 font-bold px-8 py-3 rounded-lg hover:bg-green-50 transition shadow-lg">
           Book Now — ${quote.estimatedPrice}
         </button>
         <button
-          onClick={onReset}
+          onClick={onSave}
           className="bg-green-700/70 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition border border-green-500/30"
+        >
+          💾 Save
+        </button>
+        <button
+          onClick={onReset}
+          className="bg-gray-700/70 hover:bg-gray-600 text-white px-6 py-3 rounded-lg transition border border-gray-500/30"
         >
           New Quote
         </button>
@@ -280,32 +591,38 @@ function ManualEntryForm({ onQuoteGenerated, userRegion }: { onQuoteGenerated: (
 
 // ── Main AR Scanner ────────────────────────────────────────────────
 interface ARScannerProps {
-  onQuoteGenerated?: (quote: any) => void;
+  onQuoteGenerated?: (quote: Quote) => void;
 }
 
 export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
   const [userRegion, setUserRegion] = useState('NSW');
-  const [mode, setMode] = useState<'form' | '3d' | 'quote'>('form');
+  const [mode, setMode] = useState<'form' | '3d' | 'quote' | 'saved'>('form');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const mountedRef = useRef(true);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Room dimensions (editable in 3D mode)
+  // Room dimensions
   const [roomWidth, setRoomWidth] = useState(8);
   const [roomLength, setRoomLength] = useState(6);
   const [roomHeight, setRoomHeight] = useState(2.7);
 
+  // Saved rooms
+  const [savedRooms, setSavedRooms] = useState<SavedRoom[]>([]);
+  const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
   // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
+    setSavedRooms(loadSavedRooms());
     return () => {
       mountedRef.current = false;
       if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
     };
   }, []);
 
-  // Auto-detect region from geolocation
+  // Auto-detect region
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -339,14 +656,79 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
     setMode('form');
   }, []);
 
+  const handleSaveQuote = useCallback(() => {
+    if (!quote) return;
+    const newRoom: SavedRoom = {
+      id: `room_${Date.now()}`,
+      name: `Room ${savedRooms.length + 1}`,
+      width: roomWidth,
+      length: roomLength,
+      height: roomHeight,
+      area: quote.area,
+      bedrooms: quote.bedrooms,
+      estimatedPrice: quote.estimatedPrice,
+      region: quote.region,
+      createdAt: new Date().toISOString(),
+      notes: '',
+    };
+    const updated = [newRoom, ...savedRooms];
+    setSavedRooms(updated);
+    saveRoomsToStorage(updated);
+    alert('Room saved successfully!');
+  }, [quote, savedRooms, roomWidth, roomLength, roomHeight]);
+
+  const handleDeleteRoom = useCallback(
+    (id: string) => {
+      setDeleteConfirm(id);
+    },
+    []
+  );
+
+  const confirmDelete = useCallback(() => {
+    if (!deleteConfirm) return;
+    const updated = savedRooms.filter((r) => r.id !== deleteConfirm);
+    setSavedRooms(updated);
+    saveRoomsToStorage(updated);
+    setDeleteConfirm(null);
+  }, [deleteConfirm, savedRooms]);
+
+  const handleEditRoom = useCallback((room: SavedRoom) => {
+    setEditingRoom(room);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    (editedRoom: SavedRoom) => {
+      const updated = savedRooms.map((r) => (r.id === editedRoom.id ? editedRoom : r));
+      setSavedRooms(updated);
+      saveRoomsToStorage(updated);
+      setEditingRoom(null);
+    },
+    [savedRooms]
+  );
+
+  const handleLoadRoom = useCallback(
+    (room: SavedRoom) => {
+      setRoomWidth(room.width);
+      setRoomLength(room.length);
+      setRoomHeight(room.height);
+      setUserRegion(room.region);
+      setQuote({
+        area: room.area,
+        bedrooms: room.bedrooms,
+        estimatedPrice: room.estimatedPrice,
+        region: room.region,
+      });
+      setMode('quote');
+    },
+    []
+  );
+
   const handleStart3D = useCallback(() => {
     setMode('3d');
     setIsScanning(true);
-    // Simulate scan completing after 3 seconds
     scanTimerRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
       setIsScanning(false);
-      // Auto-generate quote from room dimensions
       const area = roomWidth * roomLength;
       const pricing = PRICING_DATA[userRegion] || PRICING_DATA.NSW;
       const estimatedPrice = Math.max(pricing.minPrice, Math.round(area * pricing.baseRate));
@@ -387,17 +769,16 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
       {/* Mode Tabs */}
       <div className="flex gap-2">
         {[
-          { key: 'form' as const, label: '📝 Manual Entry', active: mode === 'form' },
-          { key: '3d' as const, label: '🏠 3D Room Scanner', active: mode === '3d' || mode === 'quote' },
+          { key: 'form' as const, label: '📝 Manual', active: mode === 'form' },
+          { key: '3d' as const, label: '🏠 3D Scan', active: mode === '3d' || mode === 'quote' },
+          { key: 'saved' as const, label: `📁 Saved (${savedRooms.length})`, active: mode === 'saved' },
         ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => {
-              if (mode !== 'quote') {
-                setMode(tab.key);
-              }
+              if (mode !== 'quote') setMode(tab.key);
             }}
-            className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition ${
+            className={`flex-1 py-3 px-3 rounded-lg text-xs sm:text-sm font-medium transition ${
               tab.active
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
@@ -460,8 +841,6 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
             <ErrorBoundary name="3D Room Scanner">
               <Scene width={roomWidth} length={roomLength} height={roomHeight} isScanning={isScanning} />
             </ErrorBoundary>
-
-            {/* Scan overlay */}
             {isScanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
                 <div className="text-center">
@@ -489,21 +868,102 @@ export default function ARScanner({ onQuoteGenerated }: ARScannerProps) {
           </button>
 
           <p className="text-xs text-gray-500 text-center">
-            Adjust room dimensions above, then click scan to generate a quote. Drag to orbit, scroll to zoom.
+            Adjust room dimensions, then scan. Drag to orbit, scroll to zoom.
           </p>
         </div>
       )}
 
+      {/* Quote Mode */}
       {mode === 'quote' && quote && (
         <>
-          {/* Show 3D scene with final room */}
           <div className="w-full h-[300px] bg-gray-900 rounded-2xl overflow-hidden border border-gray-700/50">
             <ErrorBoundary name="3D Room Preview">
               <Scene width={roomWidth} length={roomLength} height={roomHeight} isScanning={false} />
             </ErrorBoundary>
           </div>
-          <QuoteDisplay quote={quote} onReset={handleReset} />
+          <QuoteDisplay quote={quote} onReset={handleReset} onSave={handleSaveQuote} />
         </>
+      )}
+
+      {/* Saved Rooms Mode */}
+      {mode === 'saved' && (
+        <div className="space-y-4">
+          {savedRooms.length === 0 ? (
+            <div className="bg-gray-800/60 backdrop-blur rounded-xl border border-gray-700/50 p-12 text-center">
+              <div className="text-5xl mb-4">📁</div>
+              <h3 className="text-white text-xl font-semibold mb-2">No Saved Rooms Yet</h3>
+              <p className="text-gray-400 mb-4">Generate a quote and save it to see it here.</p>
+              <button
+                onClick={() => setMode('form')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition"
+              >
+                Create Your First Quote →
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="text-white font-semibold">Saved Rooms ({savedRooms.length})</h3>
+                <button
+                  onClick={() => {
+                    if (confirm('Delete all saved rooms?')) {
+                      setSavedRooms([]);
+                      saveRoomsToStorage([]);
+                    }
+                  }}
+                  className="text-xs text-red-400 hover:text-red-300 transition"
+                >
+                  Clear All
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {savedRooms.map((room) => (
+                  <SavedRoomCard
+                    key={room.id}
+                    room={room}
+                    onEdit={handleEditRoom}
+                    onDelete={handleDeleteRoom}
+                    onLoad={handleLoadRoom}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingRoom && (
+        <EditRoomModal
+          room={editingRoom}
+          onSave={handleSaveEdit}
+          onCancel={() => setEditingRoom(null)}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 rounded-2xl border border-red-700/50 p-6 max-w-sm w-full text-center">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h3 className="text-white text-lg font-bold mb-2">Delete Room?</h3>
+            <p className="text-gray-400 text-sm mb-6">This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-2.5 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg transition"
+              >
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
+import type { Quote } from '@/components/ARScanner';
 
 const ARScanner = dynamic(() => import('@/components/ARScanner'), {
   ssr: false,
@@ -15,9 +16,8 @@ export default function ARScannerClient() {
   return (
     <Suspense fallback={<div className="text-white text-center py-20">Loading...</div>}>
       <ARScanner
-        onQuoteGenerated={(quote) => {
+        onQuoteGenerated={(quote: Quote) => {
           console.log('Quote generated:', quote);
-          // Analytics event
           if (typeof window !== 'undefined' && (window as any).gtag) {
             (window as any).gtag('event', 'ar_quote_generated', {
               area: quote.area,
