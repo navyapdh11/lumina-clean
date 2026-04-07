@@ -15,10 +15,14 @@ export default function AIDashboardLayout({ children }: { children: React.ReactN
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [userRole, setUserRole] = useState('admin');
+  const [userRole, setUserRole] = useState('viewer');
 
   useEffect(() => {
-    const role = typeof window !== 'undefined' ? localStorage.getItem('lc_user_role') || 'admin' : 'admin';
+    // Fetch role from cookie (server-set, not client-manipulable localStorage)
+    // Default to 'viewer' (least privilege) — never default to 'admin'
+    const role = typeof window !== 'undefined'
+      ? (document.cookie.match(/lc_role=([^;]+)/)?.[1] || 'viewer')
+      : 'viewer';
     setUserRole(role);
   }, []);
 

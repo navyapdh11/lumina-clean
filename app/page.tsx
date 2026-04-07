@@ -15,8 +15,13 @@ function StickyHeader() {
   }, []);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('lc_auth_token') : null;
-    setIsAuthenticated(!!token);
+    // Check auth via httpOnly cookie (not localStorage — vulnerable to XSS)
+    // Cookie is server-set and not accessible to client-side JS
+    const hasSession = typeof document !== 'undefined'
+      && (document.cookie.includes('lc_session=')
+        || document.cookie.includes('sb-access-token=')
+        || document.cookie.includes('__session='));
+    setIsAuthenticated(!!hasSession);
   }, []);
 
   const navItems = [
@@ -73,8 +78,11 @@ function StickyHeader() {
             ) : (
               <button
                 onClick={() => {
-                  localStorage.removeItem('lc_auth_token');
-                  window.location.reload();
+                  // Clear client-visible cookies (httpOnly cookies cleared server-side)
+                  document.cookie = 'lc_session=; path=/; max-age=0';
+                  document.cookie = 'lc_role=; path=/; max-age=0';
+                  setIsAuthenticated(false);
+                  window.location.href = '/';
                 }}
                 className="text-gray-400 hover:text-white text-sm transition"
               >

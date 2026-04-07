@@ -174,7 +174,9 @@ async function importLeadsToCRM(leads: StrataLead[], supabase: any): Promise<boo
 export async function POST(req: NextRequest) {
   try {
     // Rate limiting check
-    const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    const clientIp = req.headers.get('x-real-ip')
+      || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || 'unknown';
     const rateLimit = checkRateLimit(clientIp, 10, 60000); // 10 requests per minute
 
     if (!rateLimit.allowed) {
