@@ -4,56 +4,29 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { LogOut, LayoutDashboard } from 'lucide-react';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    // Check for mock session in dev mode (no Supabase configured)
-    const isDev = process.env.NODE_ENV === 'development';
-    const hasSupabase =
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder') &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('your-project');
+  useEffect(() => { setReady(true); }, []);
 
-    if (!hasSupabase || isDev) {
-      // Allow access in dev/demo mode
-      setIsAuthenticated(true);
-      return;
-    }
-
-    // In production with Supabase, check session
-    // This would use @supabase/ssr createBrowserClient
-    setIsAuthenticated(true);
-  }, []);
-
-  // Show loading state while checking auth
-  if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    );
-  }
+  if (!ready) return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-2xl animate-pulse">📊</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center">
-        <Link href="/dashboard" className="text-xl font-bold text-blue-600 flex items-center gap-2">
-          <LayoutDashboard size={24} />
-          LuminaClean Dashboard
+    <div className="min-h-screen bg-[#050505]">
+      <nav className="bg-gray-900/80 backdrop-blur-xl border-b border-white/5 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+        <Link href="/dashboard" className="flex items-center gap-2 text-blue-400 font-bold text-lg">
+          <LayoutDashboard size={22} />
+          <span className="hidden sm:inline">LuminaClean Dashboard</span>
         </Link>
-        <button
-          onClick={() => setIsAuthenticated(false)}
-          className="flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:text-blue-600"
-        >
-          <LogOut size={20} /> Sign Out
-        </button>
+        <Link href="/" className="flex items-center gap-2 text-gray-400 hover:text-white px-3 py-1.5 rounded-xl hover:bg-white/5 transition text-sm font-medium">
+          <LogOut size={16} /> Sign Out
+        </Link>
       </nav>
-      <div className="p-6">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }

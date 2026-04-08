@@ -1,33 +1,25 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
-import type { Quote } from '@/components/ARScanner';
 
 const ARScanner = dynamic(() => import('@/components/ARScanner'), {
   ssr: false,
   loading: () => (
-    <div className="w-full min-h-[500px] bg-gray-900 rounded-2xl animate-pulse flex items-center justify-center">
-      <div className="text-white text-xl">Loading AR Scanner...</div>
+    <div className="w-full min-h-[500px] bg-gray-900/50 rounded-2xl animate-pulse flex items-center justify-center border border-white/5">
+      <div className="text-center">
+        <div className="text-4xl mb-3 animate-pulse">📐</div>
+        <div className="text-white text-lg font-medium">Loading AR Scanner…</div>
+      </div>
     </div>
   ),
 });
 
 export default function ARScannerClient() {
   return (
-    <Suspense fallback={<div className="text-white text-center py-20">Loading...</div>}>
-      <ARScanner
-        onQuoteGenerated={(quote: Quote) => {
-          console.log('Quote generated:', quote);
-          if (typeof window !== 'undefined' && (window as any).gtag) {
-            (window as any).gtag('event', 'ar_quote_generated', {
-              area: quote.area,
-              bedrooms: quote.bedrooms,
-              price: quote.estimatedPrice,
-              region: quote.region,
-            });
-          }
-        }}
-      />
+    <Suspense fallback={<div className="text-center py-20 text-gray-400">Loading…</div>}>
+      <ARScanner onQuoteGenerated={(q) => {
+        console.log('Quote:', q);
+      }} />
     </Suspense>
   );
 }
